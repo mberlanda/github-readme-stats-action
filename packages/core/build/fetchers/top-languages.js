@@ -17,19 +17,18 @@ const fetcher = (variables, token) => {
   return request(
     {
       query: `
-      query userInfo($login: String!, $after: String, $ownerAffiliations: [RepositoryAffiliation]) {
+      query userInfo($login: String!, $after: String, $ownerAffiliations: [RepositoryAffiliation], $isFork: Boolean) {
         user(login: $login) {
-          # do not fetch forks; order by push date so the most recently active repos
-          # are fetched first and fill the first pages.
           repositories(
             ownerAffiliations: $ownerAffiliations,
-            isFork: false,
+            isFork: $isFork,
             first: 100,
             after: $after,
             orderBy: {field: PUSHED_AT, direction: DESC}
           ) {
             nodes {
               name
+              isFork
               isPrivate
               stargazerCount
               languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
@@ -69,6 +68,8 @@ const fetcher = (variables, token) => {
  * @param {number} count_weight Weightage to be given to count.
  * @param {string[]} ownerAffiliations The owner affiliations to filter by. Default: OWNER.
  * @param {string|null} pat Optional PAT override.
+ * @param {boolean} include_forks Whether to include forked repositories. Default: false.
+ * @param {Record<string, number>} lang_multiplier Per-language byte multipliers applied before ranking. Default: {}.
  * @returns {Promise<TopLangData>} Top languages data.
  */
 const fetchTopLanguages = async (
@@ -78,11 +79,15 @@ const fetchTopLanguages = async (
   count_weight = 0,
   ownerAffiliations = [],
   pat = null,
+  include_forks = false,
+  lang_multiplier = {},
 ) => {
   if (!username) {
     throw new MissingParamError(["username"]);
   }
   ownerAffiliations = parseOwnerAffiliations(ownerAffiliations);
+  // null = no filter (include all); false = exclude forks; true = only forks
+  const isFork = include_forks ? null : false;
 
   // Paginate through all repos (sorted by PUSHED_AT DESC so recent repos come first).
   const debugFetch = process.env.DEBUG_FETCH_STATS === "true";
@@ -98,6 +103,7 @@ const fetchTopLanguages = async (
         login: username,
         after: endCursor,
         ownerAffiliations,
+        isFork,
       },
       pat,
     );
@@ -131,6 +137,7 @@ const fetchTopLanguages = async (
     }
   }
   if (debugFetch) {
+    const forkCount = allRepoNodes.filter((n) => n.isFork).length;
     const publicCount = allRepoNodes.filter((n) => !n.isPrivate).length;
     const privateCount = allRepoNodes.filter((n) => n.isPrivate).length;
     const buckets = { 0: 0, "1-9": 0, "10-99": 0, "100+": 0 };
@@ -141,8 +148,11 @@ const fetchTopLanguages = async (
       else if (s <= 99) buckets["10-99"]++;
       else buckets["100+"]++;
     }
+    const forkNote = include_forks
+      ? `forks=${forkCount} included`
+      : "forks excluded (pass include_forks=true in options to include)";
     console.log(
-      `[top-langs] Total: ${allRepoNodes.length} repos | public=${publicCount} private=${privateCount}`,
+      `[top-langs] Total: ${allRepoNodes.length} repos | public=${publicCount} private=${privateCount} | ${forkNote}`,
     );
     console.log(
       `[top-langs] Stars: 0=${buckets["0"]} | 1-9=${buckets["1-9"]} | 10-99=${buckets["10-99"]} | 100+=${buckets["100+"]}`,
@@ -163,32 +173,19 @@ const fetchTopLanguages = async (
   // filter out hidden repositories (repos are already ordered by PUSHED_AT from the API)
   let repoNodes = allRepoNodes.filter((node) => !repoToHide[node.name]);
 
-  let repoCount = 0;
   repoNodes = repoNodes
     .filter((node) => node.languages.edges.length > 0)
     // flatten the list of language nodes
     .reduce((acc, curr) => curr.languages.edges.concat(acc), [])
     .reduce((acc, prev) => {
-      // get the size of the language (bytes)
-      let langSize = prev.size;
-      // if we already have the language in the accumulator
-      // & the current language name is same as previous name
-      // add the size to the language size and increase repoCount.
-      if (acc[prev.node.name] && prev.node.name === acc[prev.node.name].name) {
-        langSize = prev.size + acc[prev.node.name].size;
-        repoCount += 1;
-      } else {
-        // reset repoCount to 1
-        // language must exist in at least one repo to be detected
-        repoCount = 1;
-      }
+      const existing = acc[prev.node.name];
       return {
         ...acc,
         [prev.node.name]: {
           name: prev.node.name,
           color: prev.node.color,
-          size: langSize,
-          count: repoCount,
+          size: existing ? prev.size + existing.size : prev.size,
+          count: existing ? existing.count + 1 : 1,
         },
       };
     }, {});
@@ -203,13 +200,23 @@ const fetchTopLanguages = async (
       `[top-langs] Note: Jupyter Notebook .ipynb files are JSON containing cell outputs and base64-encoded images, which inflates their byte count far beyond the actual code written.`,
     );
     for (const [name, data] of langsSorted.slice(0, 20)) {
-      const note =
+      const mult = lang_multiplier[name];
+      const multNote =
+        mult !== undefined ? `  [×${mult} multiplier applied]` : "";
+      const warnNote =
         name === "Jupyter Notebook"
           ? "  ⚠  includes rendered output/images"
           : "";
       console.log(
-        `[top-langs]   ${name.padEnd(30)} ${String(data.size).padStart(12)} bytes  (${data.count} repos)${note}`,
+        `[top-langs]   ${name.padEnd(30)} ${String(data.size).padStart(12)} bytes  (${data.count} repos)${warnNote}${multNote}`,
       );
+    }
+  }
+  // Apply per-language byte multipliers before the weight calculation.
+  // Use lang_multiplier=Jupyter Notebook:0.1,HTML:0.5 in options to reduce over-represented languages.
+  for (const [name, mult] of Object.entries(lang_multiplier)) {
+    if (repoNodes[name]) {
+      repoNodes[name].size = Math.round(repoNodes[name].size * mult);
     }
   }
   Object.keys(repoNodes).forEach((name) => {
