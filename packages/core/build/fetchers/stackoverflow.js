@@ -3,7 +3,20 @@ import axios from "axios";
 import { CustomError, MissingParamError } from "../common/error.js";
 
 /**
- * @typedef {{ user_id: number, display_name: string, reputation: number, badge_counts: {gold: number, silver: number, bronze: number}, answer_count: number, question_count: number, link: string, site: string }} StackOverflowData
+ * @typedef {{
+ *   user_id: number,
+ *   display_name: string,
+ *   reputation: number,
+ *   badge_counts: {gold: number, silver: number, bronze: number},
+ *   answer_count: number,
+ *   question_count: number,
+ *   up_vote_count: number,
+ *   down_vote_count: number,
+ *   view_count: number,
+ *   profile_image_data: string|null,
+ *   link: string,
+ *   site: string
+ * }} StackOverflowData
  */
 
 /**
@@ -26,12 +39,13 @@ const fetchStackOverflow = async (user_id, site = "stackoverflow") => {
 
   let res;
   try {
+    // "unsafe" filter is required to expose answer_count, question_count,
+    // up_vote_count, down_vote_count, view_count, and profile_image.
     res = await axios.get(
       `https://api.stackexchange.com/2.3/users/${numericId}`,
       {
-        params: { site, filter: "default" },
+        params: { site, filter: "unsafe" },
         timeout: 10000,
-        // Stack Exchange responses are gzip-compressed
         responseType: "json",
         decompress: true,
       },
@@ -52,6 +66,25 @@ const fetchStackOverflow = async (user_id, site = "stackoverflow") => {
   }
 
   const u = items[0];
+
+  // Fetch and base64-encode the profile picture so it can be embedded in SVG
+  // (GitHub sanitizes external <image> hrefs in rendered SVGs).
+  let profile_image_data = null;
+  if (u.profile_image) {
+    try {
+      const imgUrl = u.profile_image.replace(/[?&]s=\d+/, "") + "?s=44";
+      const imgRes = await axios.get(imgUrl, {
+        responseType: "arraybuffer",
+        timeout: 5000,
+      });
+      const ct = imgRes.headers["content-type"] || "image/jpeg";
+      const b64 = Buffer.from(imgRes.data).toString("base64");
+      profile_image_data = `data:${ct};base64,${b64}`;
+    } catch {
+      // non-fatal — card renders without avatar
+    }
+  }
+
   return {
     user_id: u.user_id,
     display_name: u.display_name,
@@ -63,6 +96,10 @@ const fetchStackOverflow = async (user_id, site = "stackoverflow") => {
     },
     answer_count: u.answer_count ?? 0,
     question_count: u.question_count ?? 0,
+    up_vote_count: u.up_vote_count ?? 0,
+    down_vote_count: u.down_vote_count ?? 0,
+    view_count: u.view_count ?? 0,
+    profile_image_data,
     link: u.link,
     site,
   };

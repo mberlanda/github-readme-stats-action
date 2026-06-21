@@ -151,6 +151,10 @@ const SO_DATA = {
   badge_counts: { gold: 1, silver: 5, bronze: 20 },
   answer_count: 42,
   question_count: 8,
+  up_vote_count: 30,
+  down_vote_count: 5,
+  view_count: 150,
+  profile_image_data: null,
   link: "https://stackoverflow.com/users/1234567/mauro-berlanda",
   site: "stackoverflow",
 };
@@ -162,7 +166,7 @@ describe("renderStackOverflow", () => {
     expect(svg).toContain("</svg>");
   });
 
-  test("shows reputation", () => {
+  test("shows reputation in orange (formatCount)", () => {
     const svg = renderStackOverflow(SO_DATA);
     expect(svg).toContain("1.3k");
   });
@@ -172,11 +176,27 @@ describe("renderStackOverflow", () => {
     expect(svg).toContain(">42<");
   });
 
+  test("shows question count", () => {
+    const svg = renderStackOverflow(SO_DATA);
+    expect(svg).toContain(">8<");
+  });
+
   test("shows badge counts", () => {
     const svg = renderStackOverflow(SO_DATA);
     expect(svg).toContain(">1<"); // gold
     expect(svg).toContain(">5<"); // silver
     expect(svg).toContain(">20<"); // bronze
+  });
+
+  test("shows votes cast (up + down)", () => {
+    const svg = renderStackOverflow(SO_DATA);
+    // 30 + 5 = 35 votes cast
+    expect(svg).toContain(">35<");
+  });
+
+  test("shows profile views", () => {
+    const svg = renderStackOverflow(SO_DATA);
+    expect(svg).toContain(">150<");
   });
 
   test("shows display name", () => {
@@ -187,6 +207,25 @@ describe("renderStackOverflow", () => {
   test("shows Stack Overflow label for default site", () => {
     const svg = renderStackOverflow(SO_DATA);
     expect(svg).toContain("Stack Overflow");
+  });
+
+  test("includes profile link in SVG anchor", () => {
+    const svg = renderStackOverflow(SO_DATA);
+    expect(svg).toContain("stackoverflow.com/users/1234567");
+  });
+
+  test("shows letter placeholder avatar when profile_image_data is null", () => {
+    const svg = renderStackOverflow(SO_DATA);
+    // First letter of "Mauro Berlanda" = M
+    expect(svg).toContain(">M<");
+  });
+
+  test("embeds base64 avatar when profile_image_data provided", () => {
+    const svg = renderStackOverflow({
+      ...SO_DATA,
+      profile_image_data: "data:image/jpeg;base64,AABB",
+    });
+    expect(svg).toContain("data:image/jpeg;base64,AABB");
   });
 
   test("applies custom_title", () => {

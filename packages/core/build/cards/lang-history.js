@@ -1,7 +1,12 @@
 // @ts-check
+import { createRequire } from "module";
 import { Card } from "../common/Card.js";
 import { getCardColors } from "../common/color.js";
 import { clampValue } from "../common/ops.js";
+
+const require = createRequire(import.meta.url);
+/** @type {Record<string, string>} */
+const GITHUB_LANG_COLORS = require("../common/languageColors.json");
 
 // Layout constants (all in body-relative coordinates; body is translated by (0, paddingY+20) = (0, 55))
 const CARD_WIDTH = 500;
@@ -17,7 +22,27 @@ const LEGEND_ROW_HEIGHT = 22;
 const LEGEND_COLS = 4;
 const LEGEND_ITEM_WIDTH = (CARD_WIDTH - 50) / LEGEND_COLS; // 50 = 2 × paddingX
 const BAR_GAP = 6;
-const DEFAULT_LANG_COLOR = "#858585";
+const OTHER_LANG_COLOR = "#858585";
+
+/**
+ * Deterministic language color lookup:
+ * 1. API-supplied color (canonical GitHub Linguist value)
+ * 2. bundled languageColors.json (same source, useful when API returns null)
+ * 3. Hash-based HSL so every unnamed language still gets a unique, vivid color.
+ *
+ * @param {string} name
+ * @param {string|null|undefined} apiColor
+ * @returns {string}
+ */
+const langColor = (name, apiColor) => {
+  if (apiColor) return apiColor;
+  if (GITHUB_LANG_COLORS[name]) return GITHUB_LANG_COLORS[name];
+  // djb2 hash → hue in [0,360)
+  let h = 5381;
+  for (let i = 0; i < name.length; i++) h = ((h << 5) + h) ^ name.charCodeAt(i);
+  const hue = (h >>> 0) % 360;
+  return `hsl(${hue},65%,55%)`;
+};
 const GRID_LINES = [
   { pct: 100, y: CHART_Y },
   { pct: 50, y: CHART_Y + CHART_HEIGHT / 2 },
@@ -45,13 +70,11 @@ const groupByYear = (repoNodes, hide = []) => {
     for (const edge of node.languages.edges) {
       const { name, color } = edge.node;
       if (hideSet.has(name.toLowerCase().trim())) continue;
+      const resolvedColor = langColor(name, color);
       if (!historyData[year][name])
-        historyData[year][name] = {
-          size: 0,
-          color: color || DEFAULT_LANG_COLOR,
-        };
+        historyData[year][name] = { size: 0, color: resolvedColor };
       historyData[year][name].size += edge.size;
-      if (!langColors[name]) langColors[name] = color || DEFAULT_LANG_COLOR;
+      if (!langColors[name]) langColors[name] = resolvedColor;
     }
   }
 
@@ -139,8 +162,8 @@ const renderLangHistory = (
   /** @param {string} name */
   const getLangColor = (name) =>
     name === "Other"
-      ? DEFAULT_LANG_COLOR
-      : langColors[name] || DEFAULT_LANG_COLOR;
+      ? OTHER_LANG_COLOR
+      : langColors[name] || langColor(name, null);
 
   // Bar dimensions
   const N = years.length;
@@ -182,7 +205,7 @@ const renderLangHistory = (
       if (hasOther && otherSize > 0) {
         const h = CHART_HEIGHT - yOff; // use remainder to avoid rounding gaps
         if (h > 0) {
-          barsHTML += `<rect x="${barX}" y="${CHART_Y + yOff}" width="${barWidth}" height="${h}" fill="${DEFAULT_LANG_COLOR}" />`;
+          barsHTML += `<rect x="${barX}" y="${CHART_Y + yOff}" width="${barWidth}" height="${h}" fill="${OTHER_LANG_COLOR}" />`;
         }
       }
     }
