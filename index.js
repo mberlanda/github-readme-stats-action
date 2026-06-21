@@ -86,13 +86,18 @@ const createCardHandlers = (coreModule, packageName) => {
     }
   }
 
+  // Fork-only cards are added only when the export is present so the action
+  // continues to work with the upstream npm package as the core.
+  const forkOnly = (name, key) =>
+    typeof coreModule[key] === "function" ? { [name]: coreModule[key] } : {};
+
   return {
     stats: coreModule.api,
     "top-langs": coreModule.topLangs,
-    // lang-history is only available in the local fork; gracefully absent from upstream npm package
-    ...(typeof coreModule.langHistory === "function"
-      ? { "lang-history": coreModule.langHistory }
-      : {}),
+    ...forkOnly("lang-history", "langHistory"),
+    ...forkOnly("rubygems", "rubyGems"),
+    ...forkOnly("pypi", "pypi"),
+    ...forkOnly("stackoverflow", "stackOverflow"),
     pin: coreModule.pin,
     wakatime: coreModule.wakatime,
     gist: coreModule.gist,
@@ -171,9 +176,18 @@ const validateCardOptions = (card, query, repoOwner) => {
     case "stats":
     case "top-langs":
     case "lang-history":
+    case "rubygems":
+    case "pypi":
     case "wakatime":
       if (!query.username) {
         throw new Error(`username is required for the ${card} card.`);
+      }
+      break;
+    case "stackoverflow":
+      if (!query.user_id) {
+        throw new Error(
+          "user_id is required for the stackoverflow card (your numeric Stack Exchange user ID).",
+        );
       }
       break;
     case "pin":
