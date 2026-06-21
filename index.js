@@ -89,6 +89,10 @@ const createCardHandlers = (coreModule, packageName) => {
   return {
     stats: coreModule.api,
     "top-langs": coreModule.topLangs,
+    // lang-history is only available in the local fork; gracefully absent from upstream npm package
+    ...(typeof coreModule.langHistory === "function"
+      ? { "lang-history": coreModule.langHistory }
+      : {}),
     pin: coreModule.pin,
     wakatime: coreModule.wakatime,
     gist: coreModule.gist,
@@ -166,6 +170,7 @@ const validateCardOptions = (card, query, repoOwner) => {
   switch (card) {
     case "stats":
     case "top-langs":
+    case "lang-history":
     case "wakatime":
       if (!query.username) {
         throw new Error(`username is required for the ${card} card.`);

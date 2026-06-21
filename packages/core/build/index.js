@@ -12,6 +12,7 @@ export { logger } from "./common/log.js";
 export { request } from "./common/http.js";
 export { default as gist } from "./api/gist.js";
 export { default as api } from "./api/index.js";
+export { default as langHistory } from "./api/lang-history.js";
 export { default as pin } from "./api/pin.js";
 export { default as topLangs } from "./api/top-langs.js";
 export { default as wakatime } from "./api/wakatime.js";
