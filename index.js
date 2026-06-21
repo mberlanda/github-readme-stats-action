@@ -9,7 +9,8 @@ import { promisify } from "node:util";
 import { getInput, info, setFailed, setOutput, warning } from "@actions/core";
 
 const execAsync = promisify(exec);
-const CORE_PACKAGE_NAME = "@stats-organization/github-readme-stats-core";
+const DEFAULT_CORE_PACKAGE_NAME =
+  "@stats-organization/github-readme-stats-core";
 const supportedCoreExports = ["api", "topLangs", "pin", "wakatime", "gist"];
 
 const validateCoreVersion = (value) => {
@@ -22,13 +23,14 @@ const validateCoreVersion = (value) => {
 
 /**
  * Install the requested core package into an isolated temporary directory.
+ * @param {string} packageName npm package name.
  * @param {string} version Package version.
  * @returns {Promise<string>} Directory containing the installed package.
  */
-const installCorePackage = async (version) => {
+const installCorePackage = async (packageName, version) => {
   const installDir = await mkdtemp(path.join(os.tmpdir(), "grs-core-"));
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-  const packageSpec = `${CORE_PACKAGE_NAME}@${version}`;
+  const packageSpec = `${packageName}@${version}`;
 
   try {
     await writeFile(
@@ -47,38 +49,38 @@ const installCorePackage = async (version) => {
 
     return installDir;
   } catch (error) {
-    throw new Error(
-      `Failed to install ${CORE_PACKAGE_NAME}@${version}: ${error}`,
-    );
+    throw new Error(`Failed to install ${packageName}@${version}: ${error}`);
   }
 };
 
 /**
- * Load the core package either from the bundled dependency or from an isolated install.
- * @param {string} version Package version.
- * @returns {Promise<Record<string, unknown>>} Loaded module and cleanup callback.
+ * Load the core package either from the workspace dependency or from an isolated install.
+ * @param {string} packageName npm package name (defaults to DEFAULT_CORE_PACKAGE_NAME).
+ * @param {string} version Package version. When empty, uses the workspace-bundled package.
+ * @returns {Promise<Record<string, unknown>>} Loaded module.
  */
-const loadCoreModule = async (version) => {
+const loadCoreModule = async (packageName, version) => {
   if (!version) {
-    return await import(CORE_PACKAGE_NAME);
+    return await import(packageName);
   }
 
-  const installDir = await installCorePackage(version);
+  const installDir = await installCorePackage(packageName, version);
   const installRequire = createRequire(path.join(installDir, "package.json"));
-  const modulePath = installRequire.resolve(CORE_PACKAGE_NAME);
+  const modulePath = installRequire.resolve(packageName);
   return await import(pathToFileURL(modulePath).href);
 };
 
 /**
  * Build the map of supported card handlers from the loaded core module.
  * @param {Record<string, unknown>} coreModule Loaded core package module.
+ * @param {string} packageName Package name used in error messages.
  * @returns {Record<string, Function>} Card handlers.
  */
-const createCardHandlers = (coreModule) => {
+const createCardHandlers = (coreModule, packageName) => {
   for (const exportName of supportedCoreExports) {
     if (typeof coreModule[exportName] !== "function") {
       throw new Error(
-        `Loaded ${CORE_PACKAGE_NAME} does not expose the expected '${exportName}' function.`,
+        `Loaded ${packageName} does not expose the expected '${exportName}' function.`,
       );
     }
   }
@@ -184,11 +186,12 @@ const run = async () => {
   const optionsInput = getInput("options") || "";
   const outputPathInput = getInput("path");
   const coreVersion = validateCoreVersion(getInput("core_version") || "");
+  const corePackage = getInput("core_package") || DEFAULT_CORE_PACKAGE_NAME;
 
-  const coreModule = await loadCoreModule(coreVersion);
+  const coreModule = await loadCoreModule(corePackage, coreVersion);
 
   // Map of card types to their respective API handlers.
-  const cardHandlers = createCardHandlers(coreModule);
+  const cardHandlers = createCardHandlers(coreModule, corePackage);
   const handler = cardHandlers[card];
   if (!handler) {
     throw new Error(`Unsupported card type: ${card}`);
