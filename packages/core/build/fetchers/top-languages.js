@@ -30,6 +30,8 @@ const fetcher = (variables, token) => {
           ) {
             nodes {
               name
+              isPrivate
+              stargazerCount
               languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
                 edges {
                   size
@@ -83,10 +85,13 @@ const fetchTopLanguages = async (
   ownerAffiliations = parseOwnerAffiliations(ownerAffiliations);
 
   // Paginate through all repos (sorted by PUSHED_AT DESC so recent repos come first).
+  const debugFetch = process.env.DEBUG_FETCH_STATS === "true";
   let allRepoNodes = [];
   let hasNextPage = true;
   let endCursor = null;
+  let pageNum = 0;
   while (hasNextPage) {
+    pageNum++;
     const res = await retryer(
       fetcher,
       {
@@ -119,6 +124,29 @@ const fetchTopLanguages = async (
     allRepoNodes = allRepoNodes.concat(pageNodes);
     hasNextPage = res.data.data.user.repositories.pageInfo.hasNextPage;
     endCursor = res.data.data.user.repositories.pageInfo.endCursor;
+    if (debugFetch) {
+      console.log(
+        `[top-langs] Page ${pageNum}: fetched ${pageNodes.length} repos (running total: ${allRepoNodes.length})`,
+      );
+    }
+  }
+  if (debugFetch) {
+    const publicCount = allRepoNodes.filter((n) => !n.isPrivate).length;
+    const privateCount = allRepoNodes.filter((n) => n.isPrivate).length;
+    const buckets = { 0: 0, "1-9": 0, "10-99": 0, "100+": 0 };
+    for (const n of allRepoNodes) {
+      const s = n.stargazerCount;
+      if (s === 0) buckets["0"]++;
+      else if (s <= 9) buckets["1-9"]++;
+      else if (s <= 99) buckets["10-99"]++;
+      else buckets["100+"]++;
+    }
+    console.log(
+      `[top-langs] Total: ${allRepoNodes.length} repos | public=${publicCount} private=${privateCount}`,
+    );
+    console.log(
+      `[top-langs] Stars: 0=${buckets["0"]} | 1-9=${buckets["1-9"]} | 10-99=${buckets["10-99"]} | 100+=${buckets["100+"]}`,
+    );
   }
 
   /** @type {Record<string, boolean>} */
@@ -164,6 +192,26 @@ const fetchTopLanguages = async (
         },
       };
     }, {});
+  if (debugFetch) {
+    const langsSorted = Object.entries(repoNodes).sort(
+      (a, b) => b[1].size - a[1].size,
+    );
+    console.log(
+      `[top-langs] Language sizes (GitHub Linguist byte counts — raw file bytes, NOT lines of code):`,
+    );
+    console.log(
+      `[top-langs] Note: Jupyter Notebook .ipynb files are JSON containing cell outputs and base64-encoded images, which inflates their byte count far beyond the actual code written.`,
+    );
+    for (const [name, data] of langsSorted.slice(0, 20)) {
+      const note =
+        name === "Jupyter Notebook"
+          ? "  ⚠  includes rendered output/images"
+          : "";
+      console.log(
+        `[top-langs]   ${name.padEnd(30)} ${String(data.size).padStart(12)} bytes  (${data.count} repos)${note}`,
+      );
+    }
+  }
   Object.keys(repoNodes).forEach((name) => {
     // comparison index calculation
     repoNodes[name].size =

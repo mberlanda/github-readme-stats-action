@@ -15,6 +15,7 @@ const GRAPHQL_REPOS_FIELD = `
     totalCount
     nodes {
       name
+      isPrivate
       stargazers {
         totalCount
       }
@@ -114,6 +115,7 @@ const statsFetcher = async ({
   ownerAffiliations,
   pat,
 }) => {
+  const debugFetch = process.env.DEBUG_FETCH_STATS === "true";
   let stats;
   let hasNextPage = true;
   let endCursor = null;
@@ -155,14 +157,47 @@ const statsFetcher = async ({
       process.env.MIN_STARS_TO_PAGINATE ?? "1",
       10,
     );
-    hasNextPage =
-      (getConfig().fetchMultiPageStars === "true" ||
-        getConfig().fetchMultiPageStars > fetchedPages) &&
-      repoNodes.every(
-        (node) => node.stargazers.totalCount >= minStarsToPaginate,
-      ) &&
-      res.data.data.user.repositories.pageInfo.hasNextPage;
+    const multiPageEnabled =
+      getConfig().fetchMultiPageStars === "true" ||
+      getConfig().fetchMultiPageStars > fetchedPages;
+    const allHaveEnoughStars = repoNodes.every(
+      (node) => node.stargazers.totalCount >= minStarsToPaginate,
+    );
+    const apiHasNextPage = res.data.data.user.repositories.pageInfo.hasNextPage;
+    hasNextPage = multiPageEnabled && allHaveEnoughStars && apiHasNextPage;
     endCursor = res.data.data.user.repositories.pageInfo.endCursor;
+    if (debugFetch) {
+      const runningTotal = stats.data.data.user.repositories.nodes.length;
+      const starMin = repoNodes.reduce(
+        (min, n) => Math.min(min, n.stargazers.totalCount),
+        Infinity,
+      );
+      const starMax = repoNodes.reduce(
+        (max, n) => Math.max(max, n.stargazers.totalCount),
+        -Infinity,
+      );
+      console.log(
+        `[stats] Page ${fetchedPages}: ${repoNodes.length} repos (stars ${isFinite(starMin) ? starMin : 0}–${isFinite(starMax) ? starMax : 0}, running total: ${runningTotal})`,
+      );
+      if (!hasNextPage) {
+        let stopReason;
+        if (!multiPageEnabled) stopReason = "FETCH_MULTI_PAGE_STARS disabled";
+        else if (!allHaveEnoughStars) {
+          const minFound = repoNodes.reduce(
+            (min, n) => Math.min(min, n.stargazers.totalCount),
+            Infinity,
+          );
+          stopReason = `repo with ${minFound} stars found (< minStarsToPaginate=${minStarsToPaginate})`;
+        } else if (!apiHasNextPage) {
+          stopReason = "no more pages";
+        } else {
+          stopReason = "unknown";
+        }
+        console.log(
+          `[stats] Pagination stopped after page ${fetchedPages}: ${stopReason}`,
+        );
+      }
+    }
   }
   return stats;
 };
@@ -382,6 +417,25 @@ const fetchStats = async (
     );
   }
   const user = res.data.data.user;
+  if (process.env.DEBUG_FETCH_STATS === "true") {
+    const repoNodes = user.repositories.nodes;
+    const publicCount = repoNodes.filter((n) => !n.isPrivate).length;
+    const privateCount = repoNodes.filter((n) => n.isPrivate).length;
+    const buckets = { 0: 0, "1-9": 0, "10-99": 0, "100+": 0 };
+    for (const n of repoNodes) {
+      const s = n.stargazers.totalCount;
+      if (s === 0) buckets["0"]++;
+      else if (s <= 9) buckets["1-9"]++;
+      else if (s <= 99) buckets["10-99"]++;
+      else buckets["100+"]++;
+    }
+    console.log(
+      `[stats] Repos: fetched=${repoNodes.length} / totalKnownByAPI=${user.repositories.totalCount} | public=${publicCount} private=${privateCount}`,
+    );
+    console.log(
+      `[stats] Stars: 0=${buckets["0"]} | 1-9=${buckets["1-9"]} | 10-99=${buckets["10-99"]} | 100+=${buckets["100+"]}`,
+    );
+  }
   stats.name = user.name || user.login;
   // if include_all_commits, fetch all commits using the REST API.
   if (include_all_commits) {

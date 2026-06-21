@@ -33,6 +33,10 @@ inputs:
     description: Enable multi-page fetching for star counts. Set to true to count stars across all repo pages, not just the first 100.
     required: false
     default: "true"
+  debug_fetch:
+    description: Log debug info during fetch — repo count per page, public/private split, star distribution, and language byte breakdown. Set to "true" to enable.
+    required: false
+    default: "false"
 outputs:
   path:
     description: Path where the SVG file was written.
@@ -75,6 +79,7 @@ runs:
         PAT_1: ${{ inputs.token || github.token }}
         MIN_STARS_TO_PAGINATE: ${{ inputs.min_stars_to_paginate }}
         FETCH_MULTI_PAGE_STARS: ${{ inputs.fetch_multi_page_stars }}
+        DEBUG_FETCH_STATS: ${{ inputs.debug_fetch }}
 branding:
   icon: bar-chart-2
   color: blue
