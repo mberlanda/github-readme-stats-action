@@ -8,6 +8,14 @@ import { getCardColors } from "./color.js";
 import { createProgressNode } from "./render.js";
 
 export const CARD_WIDTH = 400;
+
+/** Escape a string for safe embedding in an SVG text node or attribute. */
+export const escSvg = (s) =>
+  String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 const CARD_PADDING = 25;
 const INNER_WIDTH = CARD_WIDTH - CARD_PADDING * 2; // 350
 const VALUE_COL_WIDTH = 70;
@@ -51,8 +59,8 @@ const renderSummary = (stats, textColor) => {
     .slice(0, 3)
     .map(
       ({ label, value }, i) => `
-      <text x="${i * colWidth + 2}" y="12" font-size="11" fill="${textColor}" opacity="0.7">${label}</text>
-      <text x="${i * colWidth + 2}" y="34" font-size="20" font-weight="600" fill="${textColor}">${value}</text>`,
+      <text x="${i * colWidth + 2}" y="12" font-size="11" fill="${textColor}" opacity="0.7">${escSvg(label)}</text>
+      <text x="${i * colWidth + 2}" y="34" font-size="20" font-weight="600" fill="${textColor}">${escSvg(value)}</text>`,
     )
     .join("");
   return `<g transform="translate(${CARD_PADDING}, 0)">${items}</g>`;
@@ -82,8 +90,8 @@ const renderItem = (
   const delay = (index + 3) * 150;
   return `
     <g class="stagger" style="animation-delay: ${delay}ms" transform="translate(${CARD_PADDING}, ${y})">
-      <text x="2" y="13" font-size="11" fill="${textColor}">${truncate(name)}</text>
-      <text x="${INNER_WIDTH}" y="13" font-size="11" fill="${textColor}" text-anchor="end">${displayValue}</text>
+      <text x="2" y="13" font-size="11" fill="${textColor}">${escSvg(truncate(name))}</text>
+      <text x="${INNER_WIDTH}" y="13" font-size="11" fill="${textColor}" text-anchor="end">${escSvg(displayValue)}</text>
       ${createProgressNode({ x: 0, y: 20, width: PROGRESS_WIDTH, color, progress: pct, progressBarBackgroundColor: bgColor, delay })}
     </g>`;
 };

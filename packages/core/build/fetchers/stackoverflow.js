@@ -39,12 +39,15 @@ const fetchStackOverflow = async (user_id, site = "stackoverflow") => {
 
   let res;
   try {
-    // "unsafe" filter is required to expose answer_count, question_count,
-    // up_vote_count, down_vote_count, view_count, and profile_image.
+    // Custom filter created via /filters/create to expose answer_count,
+    // question_count, up_vote_count, down_vote_count, view_count, profile_image
+    // in addition to the default user fields. Using a named filter rather than
+    // the "unsafe" built-in avoids any HTML-decode ambiguity.
+    const STATS_FILTER = "!)RL-JogHwoZuazwo6-n_WuMc";
     res = await axios.get(
       `https://api.stackexchange.com/2.3/users/${numericId}`,
       {
-        params: { site, filter: "unsafe" },
+        params: { site, filter: STATS_FILTER },
         timeout: 10000,
         responseType: "json",
         decompress: true,

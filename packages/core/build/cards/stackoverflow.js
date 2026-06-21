@@ -1,7 +1,7 @@
 // @ts-check
 import { Card } from "../common/Card.js";
 import { getCardColors } from "../common/color.js";
-import { formatCount } from "../common/external-card.js";
+import { escSvg, formatCount } from "../common/external-card.js";
 
 const CARD_WIDTH = 400;
 const PAD = 25;
@@ -21,10 +21,13 @@ const AVATAR_D = AVATAR_R * 2;
  * @param {object} colors
  */
 const avatarPlaceholder = (name, colors) => {
-  const letter = (name || "?")[0].toUpperCase();
+  // Use only the first alphanumeric character; fall back to "?" to avoid
+  // injecting SVG-unsafe characters like <, &, > from API-supplied names.
+  const firstAlnum =
+    (name || "").match(/[A-Za-z0-9]/)?.[0]?.toUpperCase() ?? "?";
   return (
     `<circle cx="${AVATAR_R}" cy="${AVATAR_R}" r="${AVATAR_R}" fill="${SO_ORANGE}" opacity="0.85" />` +
-    `<text x="${AVATAR_R}" y="${AVATAR_R + 6}" text-anchor="middle" font-size="16" font-weight="700" fill="${colors.bgColor}">${letter}</text>`
+    `<text x="${AVATAR_R}" y="${AVATAR_R + 6}" text-anchor="middle" font-size="16" font-weight="700" fill="${colors.bgColor}">${firstAlnum}</text>`
   );
 };
 
@@ -81,7 +84,7 @@ const renderStackOverflow = (data, options = {}) => {
     site,
   } = data;
 
-  const siteLabel = site === "stackoverflow" ? "Stack Overflow" : site;
+  const siteLabel = site === "stackoverflow" ? "Stack Overflow" : escSvg(site);
   const votes_cast = up_vote_count + down_vote_count;
 
   // ── Avatar section (y=0..AVATAR_D) ─────────────────────────────────────────
@@ -94,14 +97,16 @@ const renderStackOverflow = (data, options = {}) => {
       <image href="${profile_image_data}" x="0" y="0" width="${AVATAR_D}" height="${AVATAR_D}" clip-path="url(#so-avatar)" />`
     : avatarPlaceholder(display_name, colors);
 
-  // Display name + site label right of avatar
+  // Display name + site label right of avatar.
+  // Attribute-escape the link href; text-escape the display name and site label.
+  const safeLink = link ? escSvg(link) : null;
   const nameX = AVATAR_D + 10;
-  const nameSection = link
-    ? `<a href="${link}" target="_blank" rel="noopener">
-        <text x="${nameX}" y="17" font-size="14" font-weight="600" fill="${colors.titleColor}">${display_name}</text>
+  const nameSection = safeLink
+    ? `<a href="${safeLink}" target="_blank" rel="noopener">
+        <text x="${nameX}" y="17" font-size="14" font-weight="600" fill="${colors.titleColor}">${escSvg(display_name)}</text>
       </a>
       <text x="${nameX}" y="34" font-size="11" fill="${colors.textColor}" opacity="0.6">${siteLabel}</text>`
-    : `<text x="${nameX}" y="17" font-size="14" font-weight="600" fill="${colors.titleColor}">${display_name}</text>
+    : `<text x="${nameX}" y="17" font-size="14" font-weight="600" fill="${colors.titleColor}">${escSvg(display_name)}</text>
        <text x="${nameX}" y="34" font-size="11" fill="${colors.textColor}" opacity="0.6">${siteLabel}</text>`;
 
   const profileRow = `<g>${avatarSection}${nameSection}</g>`;

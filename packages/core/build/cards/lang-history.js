@@ -257,4 +257,4 @@ const renderLangHistory = (
   return card.render(body);
 };
 
-export { renderLangHistory };
+export { renderLangHistory, groupByYear };

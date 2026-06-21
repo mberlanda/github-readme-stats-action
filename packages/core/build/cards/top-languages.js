@@ -171,10 +171,16 @@ const trimTopLanguages = (topLangs, langs_count, hide) => {
     // @ts-ignore
     .filter((lang) => !langsToHide[lowercaseTrim(lang.name)]);
 
-  const topSlice = langs.slice(0, langsCount);
-  const rest = langs.slice(langsCount);
+  // Reserve one slot for "Other" when there are more languages than the limit,
+  // so the total displayed count (including Other) never exceeds langs_count.
+  // Only add "Other" when langs_count >= 2 so there is always at least one
+  // named language shown alongside it.
+  const hasOverflow = langs.length > langsCount;
+  const showOther = hasOverflow && langsCount >= 2;
+  const topSlice = langs.slice(0, showOther ? langsCount - 1 : langsCount);
+  const rest = langs.slice(topSlice.length);
 
-  if (rest.length > 0) {
+  if (showOther && rest.length > 0) {
     const otherSize = rest.reduce((acc, lang) => acc + lang.size, 0);
     // @ts-ignore
     topSlice.push({

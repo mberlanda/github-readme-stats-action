@@ -48,6 +48,15 @@ const fetchDownloads = async (packageName) => {
  * @param {number} packages_count Max packages to include.
  * @returns {Promise<PyPIData>}
  */
+/** XML-escape a string for safe embedding in an XML text node. */
+const escXml = (s) =>
+  String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+
 const fetchPyPI = async (username, packages_count = 5) => {
   if (!username) throw new MissingParamError(["username"]);
 
@@ -56,7 +65,7 @@ const fetchPyPI = async (username, packages_count = 5) => {
   try {
     xmlRes = await axios.post(
       "https://pypi.org/pypi",
-      `<?xml version='1.0'?><methodCall><methodName>user_packages</methodName><params><param><value><string>${username}</string></value></param></params></methodCall>`,
+      `<?xml version='1.0'?><methodCall><methodName>user_packages</methodName><params><param><value><string>${escXml(username)}</string></value></param></params></methodCall>`,
       { headers: { "Content-Type": "text/xml" }, timeout: 10000 },
     );
   } catch (err) {
@@ -109,4 +118,4 @@ const fetchPyPI = async (username, packages_count = 5) => {
   };
 };
 
-export { fetchPyPI };
+export { fetchPyPI, parseXmlRpcPackages };

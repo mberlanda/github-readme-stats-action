@@ -167,7 +167,7 @@ export const parseOptions = (value) => {
  * @param {string | undefined} repoOwner Repository owner from environment.
  * @throws {Error} If required options are missing.
  */
-const validateCardOptions = (card, query, repoOwner) => {
+export const validateCardOptions = (card, query, repoOwner) => {
   if (!query.username && repoOwner) {
     query.username = repoOwner;
     warning("username not provided; defaulting to repository owner.");
