@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
@@ -99,7 +100,7 @@ const createCardHandlers = (coreModule, packageName) => {
  * @param {Record<string, unknown>} options Input options.
  * @returns {Record<string, string>} Normalized options.
  */
-const normalizeOptions = (options) => {
+export const normalizeOptions = (options) => {
   const normalized = {};
   for (const [key, val] of Object.entries(options)) {
     if (Array.isArray(val)) {
@@ -115,10 +116,12 @@ const normalizeOptions = (options) => {
 
 /**
  * Parse options from query string or JSON and normalize values to strings.
+ * Keys and values are trimmed to handle whitespace introduced by YAML >- folding
+ * (which inserts a space before each & on a new line).
  * @param {string} value Input value.
  * @returns {Record<string, string>} Parsed options.
  */
-const parseOptions = (value) => {
+export const parseOptions = (value) => {
   if (!value) {
     return {};
   }
@@ -135,10 +138,12 @@ const parseOptions = (value) => {
     const queryString = trimmed.startsWith("?") ? trimmed.slice(1) : trimmed;
     const params = new URLSearchParams(queryString);
     for (const [key, val] of params.entries()) {
-      if (options[key]) {
-        options[key] = `${options[key]},${val}`;
+      const cleanKey = key.trim();
+      const cleanVal = val.trim();
+      if (options[cleanKey]) {
+        options[cleanKey] = `${options[cleanKey]},${cleanVal}`;
       } else {
-        options[key] = val;
+        options[cleanKey] = cleanVal;
       }
     }
   }
@@ -216,6 +221,9 @@ const run = async () => {
   setOutput("path", outputPathValue);
 };
 
-run().catch((error) => {
-  setFailed(error instanceof Error ? error.message : String(error));
-});
+// Only execute when run directly (not when imported as a module in tests).
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  run().catch((error) => {
+    setFailed(error instanceof Error ? error.message : String(error));
+  });
+}

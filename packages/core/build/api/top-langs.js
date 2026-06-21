@@ -31,6 +31,8 @@ export default async (
     border_radius,
     border_color,
     role,
+    include_forks,
+    lang_multiplier,
     disable_animations,
     hide_progress,
     hide_values,
@@ -95,6 +97,18 @@ export default async (
     };
   }
   try {
+    // Parse lang_multiplier="Jupyter Notebook:0.1,HTML:0.5" into a dict
+    const langMultiplierMap = {};
+    if (lang_multiplier) {
+      for (const pair of String(lang_multiplier).split(",")) {
+        const colonIdx = pair.lastIndexOf(":");
+        if (colonIdx > 0) {
+          const name = pair.slice(0, colonIdx).trim();
+          const mult = parseFloat(pair.slice(colonIdx + 1));
+          if (!isNaN(mult) && mult > 0) langMultiplierMap[name] = mult;
+        }
+      }
+    }
     const topLangs = await fetchTopLanguages(
       username,
       parseArray(exclude_repo),
@@ -102,6 +116,8 @@ export default async (
       count_weight,
       parseArray(role),
       pat,
+      parseBoolean(include_forks),
+      langMultiplierMap,
     );
     return {
       status: "success",
