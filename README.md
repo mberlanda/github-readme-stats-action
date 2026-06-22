@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Generate stats card
-        uses: mberlanda/github-readme-stats-action@v2.2
+        uses: mberlanda/github-readme-stats-action@v2.3
         with:
           card: stats
           options: "username=${{ github.repository_owner }}&show_icons=true&role=OWNER,ORGANIZATION_MEMBER"
@@ -33,7 +33,7 @@ jobs:
           token: ${{ secrets.GRS_PAT }}
 
       - name: Generate top languages card
-        uses: mberlanda/github-readme-stats-action@v2.2
+        uses: mberlanda/github-readme-stats-action@v2.3
         with:
           card: top-langs
           options: "username=${{ github.repository_owner }}&layout=compact&langs_count=8&role=OWNER,ORGANIZATION_MEMBER&hide=HTML,CSS&lang_multiplier=Jupyter Notebook:0.1"
@@ -41,12 +41,41 @@ jobs:
           token: ${{ secrets.GRS_PAT }}
 
       - name: Generate language history card
-        uses: mberlanda/github-readme-stats-action@v2.2
+        uses: mberlanda/github-readme-stats-action@v2.3
         with:
           card: lang-history
           options: "username=${{ github.repository_owner }}&role=OWNER,ORGANIZATION_MEMBER&langs_count=7&hide=HTML,CSS"
           path: profile/lang-history.svg
           token: ${{ secrets.GRS_PAT }}
+
+      # External-platform cards — no GitHub token required
+      - name: Stack Overflow card
+        uses: mberlanda/github-readme-stats-action@v2.3
+        with:
+          card: stackoverflow
+          options: "user_id=YOUR_SO_USER_ID&site=stackoverflow&card_width=300"
+          path: profile/stackoverflow.svg
+
+      - name: RubyGems card
+        uses: mberlanda/github-readme-stats-action@v2.3
+        with:
+          card: rubygems
+          options: "username=YOUR_RUBYGEMS_HANDLE&gems_count=5&card_width=300"
+          path: profile/rubygems.svg
+
+      - name: PyPI card
+        uses: mberlanda/github-readme-stats-action@v2.3
+        with:
+          card: pypi
+          options: "username=YOUR_PYPI_USERNAME&packages_count=5&card_width=300"
+          path: profile/pypi.svg
+
+      - name: CPAN card
+        uses: mberlanda/github-readme-stats-action@v2.3
+        with:
+          card: cpan
+          options: "username=YOUR_PAUSE_ID&distributions_count=5&card_width=300"
+          path: profile/cpan.svg
 
       - name: Commit cards
         run: |
@@ -63,6 +92,13 @@ Then embed from your profile README:
 ![Stats](./profile/stats.svg)
 ![Top Languages](./profile/top-langs.svg)
 ![Language History](./profile/lang-history.svg)
+
+## Open Source
+
+![Stack Overflow](./profile/stackoverflow.svg)
+![RubyGems](./profile/rubygems.svg)
+![PyPI](./profile/pypi.svg)
+![CPAN](./profile/cpan.svg)
 ```
 
 > **Options format note:** Always pass multi-option strings as a single quoted line (`"key=val&key2=val2"`). YAML `>-` folding inserts a space before each `&` on a new line, which can corrupt option values (e.g. `layout="compact "` with a trailing space fails validation). The action trims these automatically, but single-line format is safer.
@@ -94,6 +130,12 @@ Then embed from your profile README:
 | `rubygems` | RubyGems profile — gem count, total downloads, top gems by downloads |
 | `pypi` | PyPI profile — package count, monthly downloads via pypistats.org |
 | `stackoverflow` | Stack Exchange profile — reputation, answers, questions, gold/silver/bronze badges |
+| `cpan` | CPAN (MetaCPAN) author profile — distribution count, top distributions by recency |
+
+All four external-platform cards include:
+- Platform logo in the card title bar (Simple Icons)
+- Clickable profile link in the summary row (opens in the platform's site)
+- `card_width` option for responsive sizing (min 250 px, default 400 px)
 
 ### New options for existing cards
 
@@ -124,7 +166,7 @@ External-platform cards (`rubygems`, `pypi`, `stackoverflow`) do not require a G
 
 | Input | Required | Default | Description |
 |---|---|---|---|
-| `card` | yes | — | Card type: `stats`, `top-langs`, `lang-history`, `rubygems`, `pypi`, `stackoverflow`, `pin`, `wakatime`, `gist` |
+| `card` | yes | — | Card type: `stats`, `top-langs`, `lang-history`, `rubygems`, `pypi`, `stackoverflow`, `cpan`, `pin`, `wakatime`, `gist` |
 | `options` | no | `""` | Card options as a single-line query string (`key=value&key2=value2`) or JSON object |
 | `path` | no | `profile/<card>.svg` | Output path for the SVG file (relative, must end in `.svg`) |
 | `token` | no | `github.token` | GitHub token. Use a PAT with `repo`+`read:user` for private repos and org repos |
@@ -211,6 +253,7 @@ No GitHub token needed — calls the public RubyGems API.
 |---|---|---|
 | `username` | RubyGems handle | |
 | `gems_count` | Number (default 5) | How many gems to list |
+| `card_width` | Number in px (min 250, default 400) | Card width — use `300` for compact mobile-friendly cards |
 
 ### PyPI card (`card: pypi`)
 
@@ -220,6 +263,7 @@ No GitHub token needed. Download counts come from [pypistats.org](https://pypist
 |---|---|---|
 | `username` | PyPI username | |
 | `packages_count` | Number (default 5) | How many packages to list |
+| `card_width` | Number in px (min 250, default 400) | Card width |
 
 ### Stack Overflow card (`card: stackoverflow`)
 
@@ -229,6 +273,19 @@ No GitHub token needed — calls the public Stack Exchange API.
 |---|---|---|
 | `user_id` | Numeric Stack Exchange user ID | Find yours in your profile URL: `stackoverflow.com/users/<user_id>/...` |
 | `site` | Stack Exchange site slug (default `stackoverflow`) | e.g. `superuser`, `serverfault`, `math` |
+| `card_width` | Number in px (min 250, default 400) | Card width |
+
+### CPAN card (`card: cpan`)
+
+No GitHub token needed — calls the public [MetaCPAN REST API](https://fastapi.metacpan.org/).
+
+| Option | Values | Notes |
+|---|---|---|
+| `username` | CPAN PAUSE ID (case-insensitive) | Find it in your MetaCPAN profile URL: `metacpan.org/author/<PAUSE_ID>` |
+| `distributions_count` | Number (default 5) | How many distributions to list |
+| `card_width` | Number in px (min 250, default 400) | Card width |
+
+Progress bars show recency: distributions released more recently score higher (max 364 points for today, min 1 for > 1 year ago).
 
 ### Pin card (`card: pin`)
 
@@ -242,7 +299,7 @@ No GitHub token needed — calls the public Stack Exchange API.
 ### Stats with org repos, all commits, and extra metrics
 
 ```yaml
-- uses: mberlanda/github-readme-stats-action@v2.2
+- uses: mberlanda/github-readme-stats-action@v2.3
   with:
     card: stats
     options: "username=${{ github.repository_owner }}&show_icons=true&include_all_commits=true&role=OWNER,ORGANIZATION_MEMBER&show=prs_merged,discussions_started"
@@ -253,7 +310,7 @@ No GitHub token needed — calls the public Stack Exchange API.
 ### Top languages — hide markup, reduce Jupyter Notebook weight
 
 ```yaml
-- uses: mberlanda/github-readme-stats-action@v2.2
+- uses: mberlanda/github-readme-stats-action@v2.3
   with:
     card: top-langs
     options: "username=${{ github.repository_owner }}&layout=compact&langs_count=8&role=OWNER,ORGANIZATION_MEMBER&hide=HTML,CSS&lang_multiplier=Jupyter Notebook:0.1"
@@ -264,7 +321,7 @@ No GitHub token needed — calls the public Stack Exchange API.
 ### Language history (stacked bar chart by year)
 
 ```yaml
-- uses: mberlanda/github-readme-stats-action@v2.2
+- uses: mberlanda/github-readme-stats-action@v2.3
   with:
     card: lang-history
     options: "username=${{ github.repository_owner }}&role=OWNER,ORGANIZATION_MEMBER&langs_count=7&hide=HTML,CSS"
@@ -275,7 +332,7 @@ No GitHub token needed — calls the public Stack Exchange API.
 ### RubyGems profile
 
 ```yaml
-- uses: mberlanda/github-readme-stats-action@v2.2
+- uses: mberlanda/github-readme-stats-action@v2.3
   with:
     card: rubygems
     options: "username=mberlanda&gems_count=5"
@@ -286,7 +343,7 @@ No GitHub token needed — calls the public Stack Exchange API.
 ### PyPI profile
 
 ```yaml
-- uses: mberlanda/github-readme-stats-action@v2.2
+- uses: mberlanda/github-readme-stats-action@v2.3
   with:
     card: pypi
     options: "username=mberlanda&packages_count=5"
@@ -296,17 +353,67 @@ No GitHub token needed — calls the public Stack Exchange API.
 ### Stack Overflow profile
 
 ```yaml
-- uses: mberlanda/github-readme-stats-action@v2.2
+- uses: mberlanda/github-readme-stats-action@v2.3
   with:
     card: stackoverflow
     options: "user_id=5687152&site=stackoverflow"
     path: profile/stackoverflow.svg
 ```
 
+### CPAN author profile
+
+```yaml
+- uses: mberlanda/github-readme-stats-action@v2.3
+  with:
+    card: cpan
+    options: "username=KUPTA&distributions_count=5"
+    path: profile/cpan.svg
+    # token not required for public MetaCPAN API
+```
+
+### Responsive Open Source section (four cards side by side)
+
+Combining all four external-platform cards with `card_width=300` gives compact, side-by-side tiles that look good on both mobile and desktop.
+
+```yaml
+- uses: mberlanda/github-readme-stats-action@v2.3
+  with:
+    card: stackoverflow
+    options: "user_id=5687152&site=stackoverflow&card_width=300"
+    path: profile/stackoverflow.svg
+
+- uses: mberlanda/github-readme-stats-action@v2.3
+  with:
+    card: rubygems
+    options: "username=mberlanda&gems_count=5&card_width=300"
+    path: profile/rubygems.svg
+
+- uses: mberlanda/github-readme-stats-action@v2.3
+  with:
+    card: pypi
+    options: "username=mberlanda&packages_count=5&card_width=300"
+    path: profile/pypi.svg
+
+- uses: mberlanda/github-readme-stats-action@v2.3
+  with:
+    card: cpan
+    options: "username=KUPTA&distributions_count=5&card_width=300"
+    path: profile/cpan.svg
+```
+
+```md
+## Open Source
+
+![SO](./profile/stackoverflow.svg)
+![RubyGems](./profile/rubygems.svg)
+![PyPI](./profile/pypi.svg)
+![CPAN](./profile/cpan.svg)
+```
+
 ### Dark theme
 
 ```yaml
-- uses: mberlanda/github-readme-stats-action@v2.2
+- uses: mberlanda/github-readme-stats-action@v2.3
   with:
     card: stats
     options: "username=${{ github.repository_owner }}&show_icons=true&theme=dark&bg_color=0D1117"
@@ -317,7 +424,7 @@ No GitHub token needed — calls the public Stack Exchange API.
 ### Debug logging — verify repo coverage
 
 ```yaml
-- uses: mberlanda/github-readme-stats-action@v2.2
+- uses: mberlanda/github-readme-stats-action@v2.3
   with:
     card: top-langs
     options: "username=${{ github.repository_owner }}&role=OWNER,ORGANIZATION_MEMBER"
@@ -337,7 +444,7 @@ When `debug_fetch: "true"` is set, the workflow log will include:
 ### Pin to a specific upstream core version
 
 ```yaml
-- uses: mberlanda/github-readme-stats-action@v2.2
+- uses: mberlanda/github-readme-stats-action@v2.3
   with:
     card: stats
     options: "username=${{ github.repository_owner }}"
@@ -361,6 +468,7 @@ If you use YAML `>-` block folding to split options across lines, YAML inserts a
 - Stack Exchange: 300 requests/day without a key. This is sufficient for a daily refresh.
 - RubyGems: no documented rate limit for read-only API.
 - pypistats.org: public, no documented rate limit.
+- MetaCPAN: public API, no documented rate limit for author/release queries.
 
 ### Vendored core package
 
