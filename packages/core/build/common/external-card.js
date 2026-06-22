@@ -47,8 +47,11 @@ export const truncate = (s, maxLen = 22) =>
   s.length > maxLen ? s.slice(0, maxLen - 1) + "…" : s;
 
 /**
- * Render a two-column summary row.
- * @param {{label: string, value: string}[]} stats Up to 3 stats.
+ * Render the summary row (up to 3 stat columns).
+ * Items with a `link` property render the value as a clickable anchor in a
+ * smaller font so that longer strings (e.g. usernames) fit in narrow columns.
+ *
+ * @param {{label: string, value: string, link?: string}[]} stats
  * @param {string} textColor
  * @param {number} innerWidth
  * @returns {string}
@@ -57,11 +60,18 @@ const renderSummary = (stats, textColor, innerWidth) => {
   const colWidth = innerWidth / Math.min(stats.length, 3);
   const items = stats
     .slice(0, 3)
-    .map(
-      ({ label, value }, i) => `
-      <text x="${i * colWidth + 2}" y="12" font-size="11" fill="${textColor}" opacity="0.7">${escSvg(label)}</text>
-      <text x="${i * colWidth + 2}" y="34" font-size="20" font-weight="600" fill="${textColor}">${escSvg(value)}</text>`,
-    )
+    .map(({ label, value, link }, i) => {
+      const x = i * colWidth + 2;
+      const safeVal = escSvg(truncate(value, 12));
+      const valueEl = link
+        ? `<a href="${escSvg(link)}" target="_blank" rel="noopener">` +
+          `<text x="${x}" y="36" font-size="13" fill="${textColor}" opacity="0.9" text-decoration="underline">${safeVal}</text>` +
+          `</a>`
+        : `<text x="${x}" y="34" font-size="20" font-weight="600" fill="${textColor}">${escSvg(value)}</text>`;
+      return `
+        <text x="${x}" y="12" font-size="11" fill="${textColor}" opacity="0.7">${escSvg(label)}</text>
+        ${valueEl}`;
+    })
     .join("");
   return `<g transform="translate(${CARD_PADDING}, 0)">${items}</g>`;
 };
@@ -106,8 +116,9 @@ const renderItem = (
  *
  * @param {object} params
  * @param {string} params.defaultTitle Default card title.
- * @param {{label: string, value: string}[]} params.summary Up to 3 header stats.
+ * @param {{label: string, value: string, link?: string}[]} params.summary Up to 3 header stats.
  * @param {{name: string, displayValue: string, rawValue: number, color?: string}[]} params.items Ordered list of items.
+ * @param {string=} params.titlePrefixIcon SVG content (16×16) for the icon shown left of the card title.
  * @param {object} params.options Card rendering options.
  * @param {string=} params.options.custom_title
  * @param {boolean=} params.options.hide_title
@@ -126,6 +137,7 @@ export const renderExternalCard = ({
   defaultTitle,
   summary,
   items,
+  titlePrefixIcon,
   options = {},
 }) => {
   const {
@@ -186,6 +198,7 @@ export const renderExternalCard = ({
     border_radius,
     defaultTitle,
     customTitle: custom_title,
+    titlePrefixIcon,
     colors,
   });
   card.setHideBorder(hide_border);
