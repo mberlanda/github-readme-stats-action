@@ -22,6 +22,7 @@ export default async (
     theme,
     border_radius,
     disable_animations,
+    card_width,
   },
   _pat = null,
 ) => {
@@ -40,6 +41,7 @@ export default async (
         theme,
         border_radius,
         disable_animations: disable_animations === "true",
+        card_width,
       }),
     };
   } catch (err) {

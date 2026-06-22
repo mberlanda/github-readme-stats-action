@@ -10,6 +10,7 @@ export { renderError } from "./common/render.js";
 export { dateDiff, clampValue } from "./common/ops.js";
 export { logger } from "./common/log.js";
 export { request } from "./common/http.js";
+export { default as cpan } from "./api/cpan.js";
 export { default as gist } from "./api/gist.js";
 export { default as api } from "./api/index.js";
 export { default as langHistory } from "./api/lang-history.js";

@@ -8,6 +8,7 @@ import { getCardColors } from "./color.js";
 import { createProgressNode } from "./render.js";
 
 export const CARD_WIDTH = 400;
+const MIN_CARD_WIDTH = 250;
 
 /** Escape a string for safe embedding in an SVG text node or attribute. */
 export const escSvg = (s) =>
@@ -17,9 +18,7 @@ export const escSvg = (s) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 const CARD_PADDING = 25;
-const INNER_WIDTH = CARD_WIDTH - CARD_PADDING * 2; // 350
 const VALUE_COL_WIDTH = 70;
-const PROGRESS_WIDTH = INNER_WIDTH - VALUE_COL_WIDTH; // 280
 const ITEM_HEIGHT = 40;
 const SUMMARY_HEIGHT = 48; // summary + divider
 const ITEMS_Y = SUMMARY_HEIGHT + 8; // where first item starts (body coords)
@@ -51,10 +50,11 @@ export const truncate = (s, maxLen = 22) =>
  * Render a two-column summary row.
  * @param {{label: string, value: string}[]} stats Up to 3 stats.
  * @param {string} textColor
+ * @param {number} innerWidth
  * @returns {string}
  */
-const renderSummary = (stats, textColor) => {
-  const colWidth = INNER_WIDTH / Math.min(stats.length, 3);
+const renderSummary = (stats, textColor, innerWidth) => {
+  const colWidth = innerWidth / Math.min(stats.length, 3);
   const items = stats
     .slice(0, 3)
     .map(
@@ -69,30 +69,35 @@ const renderSummary = (stats, textColor) => {
 /**
  * Render a horizontal divider.
  * @param {string} color
+ * @param {number} cardWidth
  * @returns {string}
  */
-const renderDivider = (color) =>
-  `<line x1="${CARD_PADDING}" y1="${SUMMARY_HEIGHT}" x2="${CARD_WIDTH - CARD_PADDING}" y2="${SUMMARY_HEIGHT}" stroke="${color}" stroke-width="1" opacity="0.15"/>`;
+const renderDivider = (color, cardWidth) =>
+  `<line x1="${CARD_PADDING}" y1="${SUMMARY_HEIGHT}" x2="${cardWidth - CARD_PADDING}" y2="${SUMMARY_HEIGHT}" stroke="${color}" stroke-width="1" opacity="0.15"/>`;
 
 /**
  * Render a single item row (name + progress bar + value).
  * @param {{name: string, displayValue: string, pct: number, color: string, index: number}} item
  * @param {string} textColor
  * @param {string} bgColor
+ * @param {number} innerWidth
+ * @param {number} progressWidth
  * @returns {string}
  */
 const renderItem = (
   { name, displayValue, pct, color, index },
   textColor,
   bgColor,
+  innerWidth,
+  progressWidth,
 ) => {
   const y = ITEMS_Y + index * ITEM_HEIGHT;
   const delay = (index + 3) * 150;
   return `
     <g class="stagger" style="animation-delay: ${delay}ms" transform="translate(${CARD_PADDING}, ${y})">
       <text x="2" y="13" font-size="11" fill="${textColor}">${escSvg(truncate(name))}</text>
-      <text x="${INNER_WIDTH}" y="13" font-size="11" fill="${textColor}" text-anchor="end">${escSvg(displayValue)}</text>
-      ${createProgressNode({ x: 0, y: 20, width: PROGRESS_WIDTH, color, progress: pct, progressBarBackgroundColor: bgColor, delay })}
+      <text x="${innerWidth}" y="13" font-size="11" fill="${textColor}" text-anchor="end">${escSvg(displayValue)}</text>
+      ${createProgressNode({ x: 0, y: 20, width: progressWidth, color, progress: pct, progressBarBackgroundColor: bgColor, delay })}
     </g>`;
 };
 
@@ -114,6 +119,7 @@ const renderItem = (
  * @param {string=} params.options.theme
  * @param {number=} params.options.border_radius
  * @param {boolean=} params.options.disable_animations
+ * @param {string|number=} params.options.card_width Override card width in pixels (min 250, default 400).
  * @returns {string} SVG string.
  */
 export const renderExternalCard = ({
@@ -133,7 +139,15 @@ export const renderExternalCard = ({
     theme,
     border_radius,
     disable_animations = false,
+    card_width: rawCardWidth,
   } = options;
+
+  const cardWidth = Math.max(
+    MIN_CARD_WIDTH,
+    parseInt(String(rawCardWidth), 10) || CARD_WIDTH,
+  );
+  const innerWidth = cardWidth - CARD_PADDING * 2;
+  const progressWidth = innerWidth - VALUE_COL_WIDTH;
 
   const colors = getCardColors({
     title_color,
@@ -158,6 +172,8 @@ export const renderExternalCard = ({
         },
         colors.textColor,
         colors.bgColor,
+        innerWidth,
+        progressWidth,
       ),
     )
     .join("");
@@ -165,7 +181,7 @@ export const renderExternalCard = ({
   const totalHeight = BODY_OFFSET + ITEMS_Y + items.length * ITEM_HEIGHT + 15;
 
   const card = new Card({
-    width: CARD_WIDTH,
+    width: cardWidth,
     height: totalHeight,
     border_radius,
     defaultTitle,
@@ -180,8 +196,8 @@ export const renderExternalCard = ({
   `);
 
   const body =
-    renderSummary(summary, colors.textColor) +
-    renderDivider(colors.textColor) +
+    renderSummary(summary, colors.textColor, innerWidth) +
+    renderDivider(colors.textColor, cardWidth) +
     itemsHTML;
   return card.render(body);
 };

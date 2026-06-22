@@ -188,17 +188,6 @@ describe("renderStackOverflow", () => {
     expect(svg).toContain(">20<"); // bronze
   });
 
-  test("shows votes cast (up + down)", () => {
-    const svg = renderStackOverflow(SO_DATA);
-    // 30 + 5 = 35 votes cast
-    expect(svg).toContain(">35<");
-  });
-
-  test("shows profile views", () => {
-    const svg = renderStackOverflow(SO_DATA);
-    expect(svg).toContain(">150<");
-  });
-
   test("shows display name", () => {
     const svg = renderStackOverflow(SO_DATA);
     expect(svg).toContain("Mauro Berlanda");

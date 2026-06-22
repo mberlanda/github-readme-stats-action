@@ -1,17 +1,17 @@
 // @ts-check
-import { renderRubyGems } from "../cards/rubygems.js";
+import { renderCPAN } from "../cards/cpan.js";
 import {
   MissingParamError,
   retrieveSecondaryMessage,
 } from "../common/error.js";
 import { renderError } from "../common/render.js";
-import { fetchRubyGems } from "../fetchers/rubygems.js";
+import { fetchCPAN } from "../fetchers/cpan.js";
 
 // @ts-ignore
 export default async (
   {
     username,
-    gems_count,
+    distributions_count,
     custom_title,
     hide_title,
     hide_border,
@@ -27,10 +27,13 @@ export default async (
   _pat = null,
 ) => {
   try {
-    const data = await fetchRubyGems(username, parseInt(gems_count, 10) || 5);
+    const data = await fetchCPAN(
+      username,
+      parseInt(distributions_count, 10) || 5,
+    );
     return {
       status: "success",
-      content: renderRubyGems(data, {
+      content: renderCPAN(data, {
         custom_title,
         hide_title: hide_title === "true",
         hide_border: hide_border === "true",

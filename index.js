@@ -98,6 +98,7 @@ const createCardHandlers = (coreModule, packageName) => {
     ...forkOnly("rubygems", "rubyGems"),
     ...forkOnly("pypi", "pypi"),
     ...forkOnly("stackoverflow", "stackOverflow"),
+    ...forkOnly("cpan", "cpan"),
     pin: coreModule.pin,
     wakatime: coreModule.wakatime,
     gist: coreModule.gist,
@@ -178,6 +179,7 @@ export const validateCardOptions = (card, query, repoOwner) => {
     case "lang-history":
     case "rubygems":
     case "pypi":
+    case "cpan":
     case "wakatime":
       if (!query.username) {
         throw new Error(`username is required for the ${card} card.`);
