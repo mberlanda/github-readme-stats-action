@@ -63,8 +63,10 @@ const renderSummary = (stats, textColor, innerWidth) => {
     .map(({ label, value, link }, i) => {
       const x = i * colWidth + 2;
       const safeVal = escSvg(truncate(value, 12));
-      const valueEl = link
-        ? `<a href="${escSvg(link)}" target="_blank" rel="noopener">` +
+      const safeLinkHref =
+        link && /^javascript:/i.test(link.trim()) ? "#" : link;
+      const valueEl = safeLinkHref
+        ? `<a href="${escSvg(safeLinkHref)}" target="_blank" rel="noopener">` +
           `<text x="${x}" y="36" font-size="13" fill="${textColor}" opacity="0.9" text-decoration="underline">${safeVal}</text>` +
           `</a>`
         : `<text x="${x}" y="34" font-size="20" font-weight="600" fill="${textColor}">${escSvg(value)}</text>`;

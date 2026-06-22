@@ -5,7 +5,11 @@ import {
   truncate,
 } from "../packages/core/build/common/external-card.js";
 import { validateCardOptions } from "../index.js";
-import { renderLangHistory } from "../packages/core/build/cards/lang-history.js";
+import {
+  renderLangHistory,
+  groupByYear,
+} from "../packages/core/build/cards/lang-history.js";
+import { parseXmlRpcPackages } from "../packages/core/build/fetchers/pypi.js";
 
 // ── formatCount ───────────────────────────────────────────────────────────────
 
@@ -235,5 +239,106 @@ describe("langColor — deterministic color fallback", () => {
     // Both hues must appear; they may or may not be equal (hash collision possible
     // but vanishingly rare for these two names)
     expect(hues.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── groupByYear ───────────────────────────────────────────────────────────────
+
+const makeRepoNode = (createdAt, langs) => ({
+  name: "repo",
+  createdAt,
+  isFork: false,
+  languages: {
+    edges: langs.map(([name, size, color]) => ({
+      size,
+      node: { name, color },
+    })),
+  },
+});
+
+describe("groupByYear", () => {
+  test("returns empty historyData and langColors for no repos", () => {
+    const { historyData, langColors } = groupByYear([]);
+    expect(historyData).toEqual({});
+    expect(langColors).toEqual({});
+  });
+
+  test("groups repos into the year extracted from createdAt", () => {
+    const nodes = [
+      makeRepoNode("2021-03-15T00:00:00Z", [["Ruby", 500, "#CC342D"]]),
+      makeRepoNode("2022-07-01T00:00:00Z", [["Ruby", 300, "#CC342D"]]),
+    ];
+    const { historyData } = groupByYear(nodes);
+    expect(Object.keys(historyData).sort()).toEqual(["2021", "2022"]);
+    expect(historyData["2021"]["Ruby"].size).toBe(500);
+    expect(historyData["2022"]["Ruby"].size).toBe(300);
+  });
+
+  test("accumulates sizes for the same language within the same year", () => {
+    const nodes = [
+      makeRepoNode("2021-01-01T00:00:00Z", [["Ruby", 400, "#CC342D"]]),
+      makeRepoNode("2021-06-01T00:00:00Z", [["Ruby", 600, "#CC342D"]]),
+    ];
+    const { historyData } = groupByYear(nodes);
+    expect(historyData["2021"]["Ruby"].size).toBe(1000);
+  });
+
+  test("excludes hidden languages (case-insensitive)", () => {
+    const nodes = [
+      makeRepoNode("2021-01-01T00:00:00Z", [
+        ["Ruby", 500, "#CC342D"],
+        ["HTML", 200, "#e34c26"],
+      ]),
+    ];
+    const { historyData } = groupByYear(nodes, ["html"]);
+    expect(historyData["2021"]["Ruby"]).toBeDefined();
+    expect(historyData["2021"]["HTML"]).toBeUndefined();
+  });
+
+  test("populates langColors with one entry per language", () => {
+    const nodes = [
+      makeRepoNode("2021-01-01T00:00:00Z", [["Ruby", 500, "#CC342D"]]),
+      makeRepoNode("2022-01-01T00:00:00Z", [["Ruby", 300, "#CC342D"]]),
+    ];
+    const { langColors } = groupByYear(nodes);
+    expect(Object.keys(langColors)).toEqual(["Ruby"]);
+  });
+});
+
+// ── parseXmlRpcPackages ───────────────────────────────────────────────────────
+
+const xmlRpcResponse = (pairs) => {
+  const dataArray = pairs
+    .flatMap(([role, pkg]) => [
+      `<value><string>${role}</string></value>`,
+      `<value><string>${pkg}</string></value>`,
+    ])
+    .join("\n");
+  return `<?xml version='1.0'?><methodResponse><params><param><value><array><data>${dataArray}</data></array></value></param></params></methodResponse>`;
+};
+
+describe("parseXmlRpcPackages", () => {
+  test("returns empty array for empty XML", () => {
+    expect(parseXmlRpcPackages("<methodResponse/>")).toEqual([]);
+  });
+
+  test("extracts package names from role/name pairs (odd-indexed strings)", () => {
+    const xml = xmlRpcResponse([
+      ["Owner", "quantik-core"],
+      ["Maintainer", "other-pkg"],
+    ]);
+    expect(parseXmlRpcPackages(xml)).toEqual(["quantik-core", "other-pkg"]);
+  });
+
+  test("handles a single package", () => {
+    const xml = xmlRpcResponse([["Owner", "my-package"]]);
+    expect(parseXmlRpcPackages(xml)).toEqual(["my-package"]);
+  });
+
+  test("ignores role strings (even-indexed)", () => {
+    const xml = xmlRpcResponse([["Owner", "pkg-a"]]);
+    const result = parseXmlRpcPackages(xml);
+    expect(result).not.toContain("Owner");
+    expect(result).toContain("pkg-a");
   });
 });

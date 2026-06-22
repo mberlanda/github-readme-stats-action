@@ -3,6 +3,8 @@ import { describe, expect, test } from "vitest";
 import { renderRubyGems } from "../packages/core/build/cards/rubygems.js";
 import { renderPyPI } from "../packages/core/build/cards/pypi.js";
 import { renderStackOverflow } from "../packages/core/build/cards/stackoverflow.js";
+import { renderCPAN } from "../packages/core/build/cards/cpan.js";
+import { renderExternalCard } from "../packages/core/build/common/external-card.js";
 
 // ── RubyGems ──────────────────────────────────────────────────────────────────
 
@@ -225,5 +227,191 @@ describe("renderStackOverflow", () => {
   test("has correct card width", () => {
     const svg = renderStackOverflow(SO_DATA);
     expect(svg).toContain('width="400"');
+  });
+
+  test("respects card_width option", () => {
+    const svg = renderStackOverflow(SO_DATA, { card_width: 300 });
+    expect(svg).toContain('width="300"');
+  });
+
+  test("clamps card_width below minimum to 250", () => {
+    const svg = renderStackOverflow(SO_DATA, { card_width: 50 });
+    expect(svg).toContain('width="250"');
+  });
+});
+
+// ── CPAN ──────────────────────────────────────────────────────────────────────
+
+const CPAN_DATA = {
+  pauseid: "KUPTA",
+  display_name: "Kupta K",
+  total_distributions: 12,
+  distributions: [
+    { name: "Acme-Module", version: "1.0.0", recency: 300 },
+    { name: "Another-Dist", version: "0.5.0", recency: 150 },
+    { name: "Old-Dist", version: "0.1.0", recency: 10 },
+  ],
+};
+
+describe("renderCPAN", () => {
+  test("returns valid SVG", () => {
+    const svg = renderCPAN(CPAN_DATA);
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("</svg>");
+  });
+
+  test("shows display_name in title when different from pauseid", () => {
+    const svg = renderCPAN(CPAN_DATA);
+    expect(svg).toContain("Kupta K");
+  });
+
+  test("uses pauseid in title when display_name equals pauseid", () => {
+    const svg = renderCPAN({ ...CPAN_DATA, display_name: "KUPTA" });
+    // Card encodes — as &#8212; in SVG text nodes
+    expect(svg).toContain("CPAN");
+    expect(svg).toContain("KUPTA");
+  });
+
+  test("shows PAUSE ID in summary", () => {
+    const svg = renderCPAN(CPAN_DATA);
+    expect(svg).toContain("KUPTA");
+  });
+
+  test("shows distribution count in summary", () => {
+    const svg = renderCPAN(CPAN_DATA);
+    expect(svg).toContain(">12<");
+  });
+
+  test("lists distribution names", () => {
+    const svg = renderCPAN(CPAN_DATA);
+    expect(svg).toContain("Acme-Module");
+    expect(svg).toContain("Another-Dist");
+  });
+
+  test("shows version as display value", () => {
+    const svg = renderCPAN(CPAN_DATA);
+    expect(svg).toContain("1.0.0");
+  });
+
+  test("includes metacpan profile link", () => {
+    const svg = renderCPAN(CPAN_DATA);
+    expect(svg).toContain("metacpan.org/author/KUPTA");
+  });
+
+  test("applies card_width option", () => {
+    const svg = renderCPAN(CPAN_DATA, { card_width: 300 });
+    expect(svg).toContain('width="300"');
+  });
+});
+
+// ── renderExternalCard — shared engine edge cases ─────────────────────────────
+
+const BASE_SUMMARY = [{ label: "Total", value: "42" }];
+const BASE_ITEMS = [
+  { name: "item-one", displayValue: "100/mo", rawValue: 100 },
+  { name: "item-two", displayValue: "50/mo", rawValue: 50 },
+];
+
+describe("renderExternalCard", () => {
+  test("summary item with link renders as anchor element", () => {
+    const svg = renderExternalCard({
+      defaultTitle: "Test",
+      summary: [
+        {
+          label: "Profile",
+          value: "myuser",
+          link: "https://example.com/myuser",
+        },
+      ],
+      items: BASE_ITEMS,
+      options: {},
+    });
+    expect(svg).toContain('href="https://example.com/myuser"');
+    expect(svg).toContain("text-decoration");
+  });
+
+  test("summary item without link renders plain text at font-size 20", () => {
+    const svg = renderExternalCard({
+      defaultTitle: "Test",
+      summary: BASE_SUMMARY,
+      items: BASE_ITEMS,
+      options: {},
+    });
+    expect(svg).toContain('font-size="20"');
+    expect(svg).not.toContain("text-decoration");
+  });
+
+  test("titlePrefixIcon content appears in SVG output", () => {
+    const icon = `<g transform="scale(.667)"><path fill="red" d="M0 0h24v24H0z"/></g>`;
+    const svg = renderExternalCard({
+      defaultTitle: "Test",
+      summary: BASE_SUMMARY,
+      items: BASE_ITEMS,
+      titlePrefixIcon: icon,
+      options: {},
+    });
+    expect(svg).toContain('fill="red"');
+  });
+
+  test("card_width option changes SVG width attribute", () => {
+    const svg = renderExternalCard({
+      defaultTitle: "Test",
+      summary: BASE_SUMMARY,
+      items: BASE_ITEMS,
+      options: { card_width: 300 },
+    });
+    expect(svg).toContain('width="300"');
+  });
+
+  test("card_width below 250 clamps to MIN_CARD_WIDTH", () => {
+    const svg = renderExternalCard({
+      defaultTitle: "Test",
+      summary: BASE_SUMMARY,
+      items: BASE_ITEMS,
+      options: { card_width: 100 },
+    });
+    expect(svg).toContain('width="250"');
+  });
+
+  test("all zero rawValues still renders without division-by-zero error", () => {
+    const svg = renderExternalCard({
+      defaultTitle: "Test",
+      summary: BASE_SUMMARY,
+      items: [
+        { name: "a", displayValue: "0", rawValue: 0 },
+        { name: "b", displayValue: "0", rawValue: 0 },
+      ],
+      options: {},
+    });
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("</svg>");
+  });
+
+  test("XSS: malicious value in summary is escaped", () => {
+    const svg = renderExternalCard({
+      defaultTitle: "Test",
+      summary: [{ label: "Name", value: "<script>alert(1)</script>" }],
+      items: BASE_ITEMS,
+      options: {},
+    });
+    expect(svg).not.toContain("<script>");
+    expect(svg).toContain("&lt;script&gt;");
+  });
+
+  test("XSS: javascript: protocol in summary link is neutralised to #", () => {
+    const svg = renderExternalCard({
+      defaultTitle: "Test",
+      summary: [
+        {
+          label: "Link",
+          value: "click",
+          link: 'javascript:alert("xss")',
+        },
+      ],
+      items: BASE_ITEMS,
+      options: {},
+    });
+    expect(svg).not.toContain('href="javascript:');
+    expect(svg).toContain('href="#"');
   });
 });
