@@ -147,6 +147,8 @@ const donutCenterTranslation = (totalLangs) => {
 };
 /**
  * Trim top languages to lang_count while also hiding certain languages.
+ * Languages beyond langs_count are grouped into a single "Other" entry so
+ * percentages always represent 100% of the non-hidden codebase.
  *
  * @param {Record<string, Lang>} topLangs Top languages.
  * @param {number} langs_count Number of languages to show.
@@ -155,26 +157,41 @@ const donutCenterTranslation = (totalLangs) => {
  */
 const trimTopLanguages = (topLangs, langs_count, hide) => {
   let langs = Object.values(topLangs);
+  /** @type {Record<string, boolean>} */
   let langsToHide = {};
   let langsCount = clampValue(langs_count, 1, MAXIMUM_LANGS_COUNT);
-  // populate langsToHide map for quick lookup
-  // while filtering out
   if (hide) {
     hide.forEach((langName) => {
       // @ts-ignore
       langsToHide[lowercaseTrim(langName)] = true;
     });
   }
-  // filter out languages to be hidden
   langs = langs
     .sort((a, b) => b.size - a.size)
-    .filter((lang) => {
-      // @ts-ignore
-      return !langsToHide[lowercaseTrim(lang.name)];
-    })
-    .slice(0, langsCount);
-  const totalLanguageSize = langs.reduce((acc, curr) => acc + curr.size, 0);
-  return { langs, totalLanguageSize };
+    // @ts-ignore
+    .filter((lang) => !langsToHide[lowercaseTrim(lang.name)]);
+
+  // Reserve one slot for "Other" when there are more languages than the limit,
+  // so the total displayed count (including Other) never exceeds langs_count.
+  // Only add "Other" when langs_count >= 2 so there is always at least one
+  // named language shown alongside it.
+  const hasOverflow = langs.length > langsCount;
+  const showOther = hasOverflow && langsCount >= 2;
+  const topSlice = langs.slice(0, showOther ? langsCount - 1 : langsCount);
+  const rest = langs.slice(topSlice.length);
+
+  if (showOther && rest.length > 0) {
+    const otherSize = rest.reduce((acc, lang) => acc + lang.size, 0);
+    // @ts-ignore
+    topSlice.push({
+      name: "Other",
+      size: otherSize,
+      color: DEFAULT_LANG_COLOR,
+    });
+  }
+
+  const totalLanguageSize = topSlice.reduce((acc, curr) => acc + curr.size, 0);
+  return { langs: topSlice, totalLanguageSize };
 };
 /**
  * Get display value corresponding to the format.
